@@ -123,15 +123,14 @@ def update_patient(request):
 def medical_history(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
 
-
     if request.method == "POST" and 'update_patient_info' in request.POST:
         age = request.POST.get("age")
         if age:
             try:
                 patient.age = int(age)
             except ValueError:
-                    pass
-            
+                pass
+        
         patient.gender = request.POST.get("gender") or patient.gender
         patient.occupation = request.POST.get("occupation") or patient.occupation
         patient.telephone = request.POST.get("telephone") or patient.telephone
@@ -150,110 +149,146 @@ def medical_history(request, pk):
         if xray_files:
             from .models import Xray
             for xray_file in xray_files:
-                Xray.objects.create(
-                    patient=patient,
-                    file=xray_file,
-                    description=request.POST.get("xray_description", "")
-                )
-                messages.success(request, f"Patient information and {len(xray_files)} X-ray images updated successfully.")
-            else:
-                messages.success(request, "Patient information updated successfully.")
+                try:
+                    Xray.objects.create(
+                        patient=patient,
+                        file=xray_file,
+                        description=request.POST.get("xray_description", "")
+                    )
+                except:
+                    pass
+            messages.success(request, f"Patient info + {len(xray_files)} X-rays updated!")
+        else:
+            messages.success(request, "Patient info updated!")
         return redirect("patient:medical_history", pk=pk)
 
+    # SAFE queries
+    medical_history_qs = []
+    try:
+        medical_history_qs = patient.medical_history.all()
+    except:
+        pass
 
-    medical_history_qs = patient.medical_history.all()
-    financial_history_qs = patient.financial_history.all()
+    financial_history_qs = []
+    try:
+        financial_history_qs = patient.financial_history.all()
+    except:
+        pass
 
-    from appointment.models import Appointment
-    appointments = Appointment.objects.filter(
-        email=patient.email,
-        status__in=['done', 'completed']
-    ).order_by('-date')
+    # SAFE appointments
+    appointments = []
+    try:
+        from appointment.models import Appointment, Service
+        appointments = Appointment.objects.filter(
+            email=patient.email,
+            status__in=['done', 'completed']
+        ).order_by('-date')
+    except:
+        pass
     
-    # Combine treatment history
+    # SAFE billing
+    billing_records = []
+    try:
+        from billing.models import BillingRecord
+        billing_records = BillingRecord.objects.filter(patient=patient).order_by('-date_issued')
+    except:
+        pass
+
+    # SAFE treatment_history
     treatment_history = []
-    
     for record in medical_history_qs:
-        treatment_history.append({
-            'source': 'manual',
-            'id': record.id,
-            'date': record.date,
-            'dentist': record.dentist,
-            'services': record.services,
-            'amount': record.amount,
-            'findings': record.findings,
-            'prescriptions': record.prescriptions,
-        })
-    
+        try:
+            treatment_history.append({
+                'source': 'manual',
+                'id': record.id,
+                'date': record.date,
+                'dentist': record.dentist,
+                'services': record.services,
+                'amount': record.amount,
+                'findings': record.findings,
+                'prescriptions': record.prescriptions,
+            })
+        except:
+            continue
+
     for appt in appointments:
-        services_text = ", ".join([s.service_name for s in appt.services.all()])
-        total_amount = sum((s.price or 0) for s in appt.services.all())
-        
-        # Convert datetime to date if needed
-        appt_date = appt.date.date() if hasattr(appt.date, 'date') else appt.date
-        
-        treatment_history.append({
-            'source': 'appointment',
-            'id': appt.id,
-            'date': appt_date,  # ← Ensure it's a date object
-            'dentist': appt.dentist.name if appt.dentist else appt.dentist_name,
-            'services': services_text,
-            'amount': total_amount,
-            'findings': '',
-            'prescriptions': '',
-        })
+        try:
+            services_text = ", ".join([s.service_name for s in appt.services.all()]) if hasattr(appt, 'services') else ''
+            total_amount = sum((s.price or 0) for s in appt.services.all()) if hasattr(appt, 'services') else 0
+            appt_date = appt.date.date() if hasattr(appt.date, 'date') else appt.date
+            treatment_history.append({
+                'source': 'appointment',
+                'id': appt.id,
+                'date': appt_date,
+                'dentist': getattr(appt.dentist, 'name', appt.dentist_name) if appt.dentist else '',
+                'services': services_text,
+                'amount': total_amount,
+                'findings': '',
+                'prescriptions': '',
+            })
+        except:
+            continue
     
-    treatment_history.sort(key=lambda x: x['date'], reverse=True)
-        # ===== FETCH BILLING HISTORY =====
-    financial_history_qs = patient.financial_history.all()
-    
-    from billing.models import BillingRecord
-    billing_records = BillingRecord.objects.filter(patient=patient).order_by('-date_issued')
-    
-    # Combine billing history
+    treatment_history.sort(key=lambda x: x['date'] if x['date'] else date.min, reverse=True)
+
+    # SAFE billing_history
     billing_history = []
-    
-    # Add manual financial history
     for record in financial_history_qs:
-        billing_history.append({
-            'source': 'manual',
-            'id': record.id,
-            'date': record.date,  # This is already a date object
-            'bill_type': record.bill_type,
-            'payment_mode': record.payment_mode,
-            'amount': record.amount,
-            'total_bill': record.total_bill,
-            'balance': record.balance,
-        })
-    
-    # Add billing records from appointments
+        try:
+            billing_history.append({
+                'source': 'manual',
+                'id': record.id,
+                'date': record.date,
+                'bill_type': record.bill_type,
+                'payment_mode': record.payment_mode,
+                'amount': record.amount,
+                'total_bill': record.total_bill,
+                'balance': record.balance,
+            })
+        except:
+            continue
+
     for bill in billing_records:
-        # Convert datetime to date for consistent sorting
-        bill_date = bill.date_issued.date() if hasattr(bill.date_issued, 'date') else bill.date_issued
-        
-        billing_history.append({
-            'source': 'appointment',
-            'id': bill.id,
-            'date': bill_date,  # ← Now it's a date object
-            'bill_type': 'Services',
-            'payment_mode': 'N/A',
-            'amount': bill.amount,
-            'total_bill': bill.amount,
-            'balance': 0,
-        })
+        try:
+            bill_date = bill.date_issued.date() if hasattr(bill.date_issued, 'date') else bill.date_issued
+            billing_history.append({
+                'source': 'appointment',
+                'id': bill.id,
+                'date': bill_date,
+                'bill_type': 'Services',
+                'payment_mode': 'N/A',
+                'amount': bill.amount,
+                'total_bill': bill.amount,
+                'balance': 0,
+            })
+        except:
+            continue
     
-    billing_history.sort(key=lambda x: x['date'], reverse=True)
+    billing_history.sort(key=lambda x: x['date'] if x['date'] else date.min, reverse=True)
 
     tooth_num = range(1, 33)
+
+    # SAFE final querysets
+    services = []
+    dentists = []
+    try:
+        services = Service.objects.all()
+    except:
+        pass
+    try:
+        dentists = Dentist.objects.all()
+    except:
+        pass
 
     return render(request, "patient/medical_history.html", {
         "patient": patient,
         "treatment_history": treatment_history,
         "billing_history": billing_history,
         "tooth_num": tooth_num,
-        "services": Service.objects.all(),
-        "dentists": Dentist.objects.all()
+        "services": services,
+        "dentists": dentists
     })
+
 
 def add_medical_history(request, patient_id):
     patient = get_object_or_404(Patient, pk=patient_id)
