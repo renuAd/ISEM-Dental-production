@@ -28,7 +28,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['https://isem-dental-production-1.onrender.com/', 'isem-dental-production-1.onrender.com', 'localhost', '127.0.0.1']
 
 
 # Application definition
