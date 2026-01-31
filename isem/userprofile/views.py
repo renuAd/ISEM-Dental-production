@@ -38,7 +38,7 @@ def patient_dashboard(request):
     next_week = today + timedelta(days=7)
 
     # All appointments of this user
-    appointments = Appointment.objects.filter(patient__user=user)
+    appointments = Appointment.objects.filter(user=user)
 
     total_appointments = appointments.count()
 
