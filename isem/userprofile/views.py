@@ -30,36 +30,45 @@ class RoleBasedLoginView(Loginview):
 @login_required
 def patient_dashboard(request):
     user = request.user
-
-    # Get patient profile
     patient = Patient.objects.filter(user=user).first()
-
     today = timezone.now().date()
     next_week = today + timedelta(days=7)
 
-    # All appointments of this user
     appointments = Appointment.objects.filter(user=user)
 
+    # SAFE counts
+    total_appointments = 0
     try:
-        total_appointments = Appointment.objects.filter(user=user).count()
+        total_appointments = appointments.count()
     except:
-        total_appointments = 0
+        pass
 
-    upcoming_appointments = appointments.filter(
-        date__gte=today,
-        status__in=["not_arrived", "arrived", "ongoing"]
-    ).count()
+    upcoming_appointments = 0
+    try:
+        upcoming_appointments = appointments.filter(
+            date__gte=today,
+            status__in=["not_arrived", "arrived", "ongoing"]
+        ).count()
+    except:
+        pass
 
-    cancelled_appointments = appointments.filter(
-        status="cancelled",
-        date__gte=today - timedelta(days=7)
-    ).count()
+    cancelled_appointments = 0
+    try:
+        cancelled_appointments = appointments.filter(
+            status="cancelled",
+            date__gte=today - timedelta(days=7)
+        ).count()
+    except:
+        pass
 
-    # Next appointment
-    next_appointment = appointments.filter(
-        date__gte=today,
-        status__in=["not_arrived", "arrived"]
-    ).order_by("date", "time").first()
+    next_appointment = None
+    try:
+        next_appointment = appointments.filter(
+            date__gte=today,
+            status__in=["not_arrived", "arrived"]
+        ).order_by("date", "time").first()
+    except:
+        pass
 
     context = {
         "patient": patient,
@@ -68,8 +77,8 @@ def patient_dashboard(request):
         "cancelled_appointments": cancelled_appointments,
         "next_appointment": next_appointment,
     }
-
     return render(request, "userprofile/homepage.html", context)
+
 
 def signin(request):
     if request.method == "POST":
