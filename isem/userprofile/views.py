@@ -40,7 +40,10 @@ def patient_dashboard(request):
     # All appointments of this user
     appointments = Appointment.objects.filter(user=user)
 
-    total_appointments = appointments.count()
+    try:
+        total_appointments = Appointment.objects.filter(user=user).count()
+    except:
+        total_appointments = 0
 
     upcoming_appointments = appointments.filter(
         date__gte=today,
