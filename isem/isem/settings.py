@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,17 +82,21 @@ WSGI_APPLICATION = "isem.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
-    "default": {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'isem_db',         # database name you created
-        'USER': 'root',            # default WAMP username
-        'PASSWORD': 'admin123',             # WAMP password of your account (e.g. p@ssw0rd) #renuupassword = admin123
-        'HOST': 'localhost',       # or 'localhost'
-        'PORT': '3306',            # default MySQL port in WAMP
-    }
+    'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
 }
+
+if not os.environ.get('DATABASE_URL'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'isem_db',
+            'USER': 'root',
+            'PASSWORD': 'admin123',
+            'HOST': 'localhost',
+            'PORT': '3306',
+        }
+    }
 
 
 # Password validation
